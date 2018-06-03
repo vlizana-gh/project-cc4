@@ -1,6 +1,7 @@
 import numpy as np
 
-def momentum_transfer_step(wa,mo_x,mo_y,te,alpha,gamma,delta_t=1.0,h=1.0,density=1.0):
+def momentum_transfer_step(wa,mo_x,mo_y,te,alpha,gamma,
+        delta_t=1.0,h=1.0,density=1.0):
     # Level
     le = wa+te
     # Copy of water used to avoid 0/0 errors.
