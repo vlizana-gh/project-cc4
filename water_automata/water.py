@@ -1,6 +1,6 @@
 import numpy as np
 
-def momentum_transfer_step(wa,mo_x,mo_y,te,alpha,gamma,
+def momentum_transfer_step(wa,mo_x,mo_y,te,alpha,gamma,decay=0.2,
         delta_t=1.0,h=1.0,density=1.0):
     # Level
     le = wa+te
@@ -79,6 +79,9 @@ def momentum_transfer_step(wa,mo_x,mo_y,te,alpha,gamma,
     mo_y_f[:,1:] += mo_y_tran_d-mo_y_tran_a
     mo_y_f[:-1,:] += mo_y_tran_w-mo_y_tran_s +mo_gen_w
     mo_y_f[1:,:] += mo_y_tran_s-mo_y_tran_w +mo_gen_s
+    # Momentum decay:
+    mo_x_f *= (1.0-decay)**delta_t
+    mo_y_f *= (1.0-decay)**delta_t
     # Return
     return wa_f, mo_x_f, mo_y_f
 
