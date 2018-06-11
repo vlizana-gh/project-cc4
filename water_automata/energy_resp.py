@@ -46,23 +46,42 @@ def warp_focus_sum(z):
     #
     return w
 
-def warp_shift_to_dir(z,d):
+def warp_transf_on_dir(z):
     # Compute transference totals on each direction:
-    w = np.zeros(z.shape)
-    if d==0:
-        w[:,1:] = z[:,:-1]
-        w[:,0] = z[:,-1]
-    elif d==1:
-        w[:,:-1] = z[:,1:]
-        w[:,-1] = z[:,0]
-    elif d==2:
-        w[1:,:] = z[:-1,:]
-        w[0,:] = z[-1,:]
-    elif d==3:
-        w[:-1,:] = z[1:,:]
-        w[-1,:] = z[0,:]
-    return w
-
+    tots_d = z[:,:,0]+z[:,:,2]+z[:,:,3]
+    tots_a = z[:,:,1]+z[:,:,2]+z[:,:,3]
+    tots_s = z[:,:,0]+z[:,:,1]+z[:,:,2]
+    tots_w = z[:,:,0]+z[:,:,1]+z[:,:,3]
+    # To avoid divisions by 0.
+    tots_d[tots_d==0] = 1
+    tots_a[tots_a==0] = 1
+    tots_s[tots_s==0] = 1
+    tots_w[tots_w==0] = 1
+    tots_d = np.stack([tots_d]*4,axis=2)
+    tots_a = np.stack([tots_a]*4,axis=2)
+    tots_s = np.stack([tots_s]*4,axis=2)
+    tots_w = np.stack([tots_w]*4,axis=2)
+    # Compute transference coeficients:
+    coefs_d = z/tots_d
+    coefs_d[:,:,1] = 0
+    coefs_a = z/tots_a
+    coefs_a[:,:,0] = 0
+    coefs_s = z/tots_s
+    coefs_s[:,:,3] = 0
+    coefs_w = z/tots_w
+    coefs_w[:,:,2] = 0
+    # Compute transference:
+    z_d = coefs_d*np.stack([z[:,:,0]]*4,axis=2)
+    z_a = coefs_a*np.stack([z[:,:,1]]*4,axis=2)
+    z_s = coefs_s*np.stack([z[:,:,2]]*4,axis=2)
+    z_w = coefs_w*np.stack([z[:,:,3]]*4,axis=2)
+    # Transfer
+    zz = [z_d,z_a,z_s,z_w]
+    t = np.zeros(z.shape)
+    for i in range(4):
+        wz = warp(zz[i])
+        t[:,:,i] = wz[1:-1,:-2,0]+wz[1:-1,2:,1]+wz[:-2,1:-1,2]+wz[2:,1:-1,3]
+    return t
 
 def bounce(z):
     # TODO: Enhance to considerate adjacent direction drag.
@@ -83,7 +102,6 @@ def energy_transfer_step(wa,kine,te,gg=9.8,delta_t=1.0,hh=1.0,nn=0.01,pp=997,wat
     wa_l = warp(wa)
     te_l = warp(te)
     le_l = te_l+wa_l
-    #
     wa4 = np.stack([wa,wa,wa,wa],axis=2)
     wa4_div = wa4.copy()
     wa4_div[wa4_div==0] = 1
@@ -118,23 +136,14 @@ def energy_transfer_step(wa,kine,te,gg=9.8,delta_t=1.0,hh=1.0,nn=0.01,pp=997,wat
     n_wa = wa.copy()
     n_wa += warp_focus_sum(wa_t) - np.sum(wa_t,axis=2)
     # Energy bounce:
-    kine_b = (ct_coef)*kine*kivel*delta_t/hh
+    kine_e_b = (ct_coef)*kine*kivel*delta_t/hh
     # Energy transfer:
-    kine_t_d = (1.0-ct_coef)*kine*np.stack([kine_w_t[:,:,0]]*4,axis=2)/wa4_div
-    kine_t_d[:,:,1] = 0
-    kine_t_a = (1.0-ct_coef)*kine*np.stack([kine_w_t[:,:,1]]*4,axis=2)/wa4_div
-    kine_t_a[:,:,0] = 0
-    kine_t_s = (1.0-ct_coef)*kine*np.stack([kine_w_t[:,:,2]]*4,axis=2)/wa4_div
-    kine_t_s[:,:,3] = 0
-    kine_t_w = (1.0-ct_coef)*kine*np.stack([kine_w_t[:,:,3]]*4,axis=2)/wa4_div
-    kine_t_w[:,:,2] = 0
+    kine_e_t = (1.0-ct_coef)*kine*kivel*delta_t/hh
     # Kinetic energy change due change in potential energy:
     kine_new = gg*hh*hh*pp*warp_delta(wa,n_wa)*wa_t
     # New kinetic energy:
-    n_kine = kine + kine_new
-    n_kine -= kine_t_d + kine_t_a + kine_t_w + kine_t_s
-    n_kine += warp_shift_to_dir(kine_t_d,0) + warp_shift_to_dir(kine_t_a,1)
-    n_kine += warp_shift_to_dir(kine_t_s,2) + warp_shift_to_dir(kine_t_w,3)
+    n_kine = kine + warp_transf_on_dir(kine_new+kine_e_t) + bounce(kine_e_b)
+    n_kine -= kine_e_t + kine_e_b
     n_kine = np.maximum(0,n_kine)
     #
     return n_wa,n_kine
