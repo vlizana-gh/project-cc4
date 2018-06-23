@@ -78,7 +78,7 @@ def bounce(z):
 def energy_transfer_step(wa,kine,te,gg=9.8,delta_t=1.0,hh=1.0,nn=0.01,pp=997,watransf=0.2):
     assert(kine.shape[:-1]==wa.shape)
     assert(te.shape==wa.shape)
-    assert(kine.shape[2]==4) # WASD
+    assert(kine.shape[2]==4) # DAWS
     # Level and auxs
     wa_l = warp(wa)
     te_l = warp(te)
