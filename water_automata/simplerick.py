@@ -98,8 +98,8 @@ def simplerick_step(wa,mo_x,mo_y,delta_t=0.01,hh=1.0,gg=9.8,vel=1.0):
     n_mo_y = mo_y.copy()
     # Momentum generated on discharges
     cd_x,cd_y = central_difference(le)
-    mo_x_g = -2*disch*stack((gg*np.abs(cd_x))**0.5*np.sign(cd_x))
-    mo_y_g = -2*disch*stack((gg*np.abs(cd_y))**0.5*np.sign(cd_y))
+    mo_x_g = -disch*stack((2*gg*np.abs(cd_x))**0.5*np.sign(cd_x))
+    mo_y_g = -disch*stack((2*gg*np.abs(cd_y))**0.5*np.sign(cd_y))
     # Momentum transfer on discharges:
     mo_x_t = stack(mo_x)*disch/wa4_div
     mo_y_t = stack(mo_y)*disch/wa4_div
