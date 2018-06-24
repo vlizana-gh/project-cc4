@@ -75,6 +75,17 @@ def central_difference(z):
     cd_y = z[2:,1:-1]-z[:-2,1:-1]
     return cd_x/2.0,cd_y/2.0
 
+def contraflux(z):
+    stack_x = np.minimum(z[:,:,0],z[:,:,1])
+    stack_y = np.minimum(z[:,:,2],z[:,:,3])
+    stack = np.zeros(z.shape)
+    stack[:,:,0] += stack_x/2.0
+    stack[:,:,1] += stack_x/2.0
+    stack[:,:,2] += stack_y/2.0
+    stack[:,:,3] += stack_y/2.0
+    return stack
+
+
 def simplerick_step(wa,mo_x,mo_y,delta_t=0.01,hh=1.0,gg=9.8,vel=1.0):
     assert(mo_x.shape==wa.shape)
     assert(mo_y.shape==wa.shape)
@@ -83,13 +94,18 @@ def simplerick_step(wa,mo_x,mo_y,delta_t=0.01,hh=1.0,gg=9.8,vel=1.0):
     stack = lambda v : np.stack([v]*4,axis=2)
     wa4_div = stack(wa)
     wa4_div[wa4_div==0] = np.inf
-    # Native discharges:
-    disch = np.maximum(difference(le),0)*vel*delta_t/hh
-    # Discharges due momentum:
-    disch[:,:,0] += np.maximum(0,mo_x) * delta_t/hh
-    disch[:,:,1] += np.maximum(0,-mo_x) * delta_t/hh
-    disch[:,:,2] += np.maximum(0,mo_y) * delta_t/hh
-    disch[:,:,3] += np.maximum(0,-mo_y) * delta_t/hh
+    cd_x,cd_y = central_difference(le)
+    # Momentum that should be generated on each direction:
+    di_le2 = difference(le**2)
+    mom_p = 0.5*gg*di_le2*delta_t/hh
+    cflux = contraflux(mom_p) # Add cflux to the discharge
+    disch = cflux*delta_t/hh
+    # Discharges
+    # disch = np.zeros(wa4_div.shape)
+    disch[:,:,0] += np.maximum(0,mo_x)*delta_t/hh
+    disch[:,:,1] += np.maximum(0,-mo_x)*delta_t/hh
+    disch[:,:,2] += np.maximum(0,mo_y)*delta_t/hh
+    disch[:,:,3] += np.maximum(0,-mo_y)*delta_t/hh
     # New water:
     n_wa = wa.copy()
     n_wa += transference(disch,True)
@@ -97,15 +113,17 @@ def simplerick_step(wa,mo_x,mo_y,delta_t=0.01,hh=1.0,gg=9.8,vel=1.0):
     n_mo_x = mo_x.copy()
     n_mo_y = mo_y.copy()
     # Momentum generated on discharges
-    cd_x,cd_y = central_difference(le)
-    mo_x_g = -2*disch*stack((gg*np.abs(cd_x))**0.5*np.sign(cd_x))
-    mo_y_g = -2*disch*stack((gg*np.abs(cd_y))**0.5*np.sign(cd_y))
+    mo_x_g = -0.5*gg*disch*stack(cd_x)*delta_t/hh
+    mo_y_g = -0.5*gg*disch*stack(cd_y)*delta_t/hh
     # Momentum transfer on discharges:
     mo_x_t = stack(mo_x)*disch/wa4_div
     mo_y_t = stack(mo_y)*disch/wa4_div
     #
-    n_mo_x += transference(mo_x_t,True)+transference(mo_x_g,False)
-    n_mo_y += transference(mo_y_t,True)+transference(mo_y_g,False)
+    n_mo_x += transference(mo_x_t,True)+transference(mo_x_g,False)#+mo_x_k
+    n_mo_y += transference(mo_y_t,True)+transference(mo_y_g,False)#+mo_y_k
+    # Normal addition of momentum
+    n_mo_x += mom_p[:,:,0]-mom_p[:,:,1]
+    n_mo_y += mom_p[:,:,2]-mom_p[:,:,3]
     # Return
     return n_wa,n_mo_x,n_mo_y
 
